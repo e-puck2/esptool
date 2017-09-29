@@ -317,9 +317,15 @@ class ESPLoader(object):
         #
         # DTR & RTS are active low signals,
         # ie True = pin @ 0V, False = pin @ VCC.
+        # DBR checks :
+        # 1. On Linux, DTR and RTS set commands are seen independently.
+        #    Set command without change on one of them is not received on STM32 CDC-ACM USB.
+        # 2. On Windows, RTS set command is seen on next DTR set comnnand. But any set command
+        #    of DTR with/without change is received on STM32 CDC-ACM USB.
         if mode != 'no_reset':
             self._port.setDTR(False)  # IO0=HIGH
             self._port.setRTS(True)   # EN=LOW, chip in reset
+            self._port.setDTR(False)  # Added for Windows use because RTS change is seen on next DTR set command
             time.sleep(0.1)
             if esp32r0_delay:
                 # Some chips are more likely to trigger the esp32r0
@@ -328,6 +334,7 @@ class ESPLoader(object):
                 time.sleep(1.2)
             self._port.setDTR(True)   # IO0=LOW
             self._port.setRTS(False)  # EN=HIGH, chip out of reset
+            self._port.setDTR(True)   # Added for Windows use because RTS change is seen on next DTR command
             if esp32r0_delay:
                 # Sleep longer after reset.
                 # This workaround only works on revision 0 ESP32 chips,
@@ -774,8 +781,10 @@ class ESPLoader(object):
 
     def hard_reset(self):
         self._port.setRTS(True)  # EN->LOW
+        self._port.setDTR(False)  # Added for Windows use because RTS change is seen on next DTR set command
         time.sleep(0.1)
         self._port.setRTS(False)
+        self._port.setDTR(False)  # Added for Windows use because RTS change is seen on next DTR set command
 
     def soft_reset(self, stay_in_bootloader):
         if not self.IS_STUB:
